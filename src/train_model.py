@@ -17,6 +17,7 @@ train_labels = to_categorical(train_labels)
 test_labels = to_categorical(test_labels)
 
 #Create the CNN model
+"""
 model = models.Sequential([
     layers.Input((28, 28, 1)),
     layers.Rescaling(1. / 255),
@@ -26,11 +27,27 @@ model = models.Sequential([
     layers.MaxPooling2D((2, 2)),
     layers.Flatten(),
     layers.Dense(64, activation='relu'),
-    layers.Dense(10, activation='softmax')
-    ])
+    layers.Dense(10, activation='linear')
+    ])"""
+
+model = models.Sequential([
+    layers.Input(shape=(28,28,1)),
+    layers.Rescaling(1./255),
+    layers.Conv2D(128, kernel_size=(5,5), strides=(1,1), padding='same', activation='relu'),
+    layers.Conv2D(64, kernel_size=(5,5), strides=(1,1), padding='same', activation='relu'),
+    layers.MaxPooling2D(strides=(2,2), padding='valid'),
+    layers.Conv2D(32, kernel_size=(3,3), strides=(1,1), padding='same', activation='relu'),
+    layers.Conv2D(32, kernel_size=(3,3), strides=(1,1), padding='same', activation='relu'),
+    layers.MaxPooling2D(strides=(2,2), padding='valid'),
+    layers.Dropout(0.25),
+    layers.Flatten(),
+    layers.Dense(32, activation='relu'),
+    layers.Dropout(0.5),
+    layers.Dense(10, activation='linear')
+])
 
 #Train the model
-model.compile(optimizer='adam', loss=CategoricalCrossentropy(from_logits=False), metrics=['accuracy'])
+model.compile(optimizer='adam', loss=CategoricalCrossentropy(from_logits=True), metrics=['accuracy'])
 model.fit(train_images, train_labels, epochs=5, batch_size=64, validation_split=0.1)
 
 #Evaluate the model
