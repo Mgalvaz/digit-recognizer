@@ -1,4 +1,4 @@
-import tensorflow as tf
+import json
 from keras.losses import CategoricalCrossentropy
 from keras import layers, models
 from keras.datasets import mnist
@@ -17,8 +17,8 @@ train_labels = to_categorical(train_labels)
 test_labels = to_categorical(test_labels)
 
 #Create the CNN model
-"""
-model = models.Sequential([
+
+"""model = models.Sequential([
     layers.Input((28, 28, 1)),
     layers.Rescaling(1. / 255),
     layers.Conv2D(32, (3, 3), activation='relu'),
@@ -33,11 +33,10 @@ model = models.Sequential([
 model = models.Sequential([
     layers.Input(shape=(28,28,1)),
     layers.Rescaling(1./255),
-    layers.Conv2D(128, kernel_size=(5,5), strides=(1,1), padding='same', activation='relu'),
+    layers.Conv2D(32, kernel_size=(5,5), strides=(1,1), padding='same', activation='relu'),
     layers.Conv2D(64, kernel_size=(5,5), strides=(1,1), padding='same', activation='relu'),
     layers.MaxPooling2D(strides=(2,2), padding='valid'),
-    layers.Conv2D(32, kernel_size=(3,3), strides=(1,1), padding='same', activation='relu'),
-    layers.Conv2D(32, kernel_size=(3,3), strides=(1,1), padding='same', activation='relu'),
+    layers.Conv2D(128, kernel_size=(3,3), strides=(1,1), padding='same', activation='relu'),
     layers.MaxPooling2D(strides=(2,2), padding='valid'),
     layers.Dropout(0.25),
     layers.Flatten(),
@@ -48,7 +47,7 @@ model = models.Sequential([
 
 #Train the model
 model.compile(optimizer='adam', loss=CategoricalCrossentropy(from_logits=True), metrics=['accuracy'])
-model.fit(train_images, train_labels, epochs=5, batch_size=64, validation_split=0.1)
+history = model.fit(train_images, train_labels, epochs=5, batch_size=64, validation_split=0.1)
 
 #Evaluate the model
 test_loss, test_acc = model.evaluate(test_images, test_labels)
@@ -57,6 +56,8 @@ print(f"Test accuracy: {test_acc:.4f}")
 #Save the model
 MODEL_DIR = "models"
 os.makedirs(MODEL_DIR, exist_ok=True)
-MODEL_PATH = os.path.join(MODEL_DIR, "mnist_cnn.h5")
+MODEL_PATH = os.path.join(MODEL_DIR, "mnist_cnn1.keras")
 model.save(MODEL_PATH)
 print(f"Model saved at {MODEL_PATH}")
+with open("models/history1.json", "w") as f:
+    json.dump(history.history, f)
