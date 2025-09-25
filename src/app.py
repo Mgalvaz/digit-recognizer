@@ -14,7 +14,6 @@ MODEL2 = load_model(f'models/mnist_cnn2.keras')
 def single_model(m1: bool):
     model = MODEL1 if m1 else MODEL2
     st.title('Digit Recognizer')
-    st.sidebar.subheader('Model Configuration')
 
     # Canvas configuration
     if "canvas_key" not in st.session_state:
@@ -31,7 +30,7 @@ def single_model(m1: bool):
         )
 
     #Prediction
-    threshold = 0.4
+    threshold = st.sidebar.number_input('Threshold: ', 0.0, 1.0, value = 0.4, disabled=True)
     if st.button("Predecir"):
         if canvas_result.image_data is not None:
 
@@ -74,12 +73,41 @@ def ensemble_model(arith: bool):
     model2 = MODEL2
 
     st.title('Digit Recognizer')
-    st.sidebar.subheader('Model Configuration')
-    alpha = 0.5
-    alpha = st.sidebar.slider('Weighted parameters: ', float(0), float(100), value=alpha*100,) / 100
-    beta = 1 - alpha if arith else 1 / alpha
-    alpha = st.sidebar.number_input('alpha: ', float(0), float(100), value=alpha*100)
-    beta = st.sidebar.number_input('beta: ', float(0), float(100), value=beta*100)
+
+    # --- Inicialización ---
+    if "alpha" not in st.session_state:
+        st.session_state.alpha = 0.5
+    if "beta" not in st.session_state:
+        st.session_state.beta = 0.5
+
+    # --- Funciones de sincronización ---
+    def update_from_slider():
+        st.session_state.alpha = st.session_state.alpha_slider
+        st.session_state.beta = 1 - st.session_state.alpha_slider
+        st.session_state.alpha_num = st.session_state.alpha
+        st.session_state.beta_num = st.session_state.beta
+
+    def update_from_alpha_num():
+        st.session_state.alpha = st.session_state.alpha_num
+        st.session_state.beta = 1 - st.session_state.alpha_num
+        st.session_state.alpha_slider = st.session_state.alpha
+        st.session_state.beta_num = st.session_state.beta
+
+    def update_from_beta_num():
+        st.session_state.beta = st.session_state.beta_num
+        st.session_state.alpha = 1 - st.session_state.beta_num
+        st.session_state.alpha_num = st.session_state.alpha
+        st.session_state.alpha_slider = st.session_state.alpha
+
+    # --- Widgets ---
+    st.sidebar.slider("Weighted parameters (Model 1)", 0.11, 0.99, value=st.session_state.alpha, key="alpha_slider", on_change=update_from_slider)
+    c1, c2 = st.sidebar.columns(2)
+    c1.number_input("Model 1:", 0.01, 0.99, value=st.session_state.alpha, key="alpha_num", on_change=update_from_alpha_num)
+    c2.number_input("Model 2:", 0.01, 0.99, value=st.session_state.beta, key="beta_num", on_change=update_from_beta_num)
+
+    # Valores finales sincronizados
+    alpha = st.session_state.alpha
+    beta = st.session_state.beta
 
     # Canvas configuration
     if "canvas_key" not in st.session_state:
@@ -96,7 +124,7 @@ def ensemble_model(arith: bool):
     )
 
     # Prediction
-    threshold = 0.4
+    threshold = st.sidebar.number_input('Threshold: ', 0.0, 1.0, value = 0.4, disabled=True)
     if st.button("Predecir"):
         if canvas_result.image_data is not None:
             img = Image.fromarray(np.uint8(canvas_result.image_data[:, :, 0]))
@@ -111,7 +139,8 @@ def ensemble_model(arith: bool):
             if arith:
                 combined_pred = alpha * pred1 + beta * pred2
             else:
-                combined_pred = np.sqrt(alpha * np.power(pred1, 2) + beta * np.power(pred2, 2))
+                combined_pred = np.power(pred1, alpha) * np.power(pred2, beta)
+                combined_pred /= sum(combined_pred)
 
             digit = np.argmax(combined_pred)
             st.session_state.pred_digit = digit if combined_pred[digit] >= threshold else None
@@ -161,6 +190,11 @@ models = {
     'Arithmetic Mean': partial(ensemble_model, True),
     'Geometric Mean': partial(ensemble_model, False)
 }
-model_type = st.sidebar.selectbox('Page:', options=models.keys())
+
+st.sidebar.header('Model Configuration')
+model_type = st.sidebar.selectbox('Model:', options=models.keys())
 st.set_page_config(page_title='App Digit Recognizer')
 models[model_type]()
+with st.sidebar:
+    st.markdown('---')
+
