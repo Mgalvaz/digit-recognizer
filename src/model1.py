@@ -1,11 +1,13 @@
-import io
+import json
 import streamlit as st
 from graphviz import Digraph
 from keras.models import load_model
+import altair as alt
+import pandas as pd
 
 def tuple_str(t):
     if len(t) == 1:
-        return f"({t[0]})"
+        return f'({t[0]})'
     return str(t)
 
 st.title('Model 1')
@@ -32,7 +34,7 @@ for i, layer in enumerate(model.layers):
                 {{ Input: {input_shape} | Output: {output_shape} }} }}'''
 
     #Create the layer
-    dot.node(str(i), label=label, shape="record", style="filled", fillcolor="lightblue", tooltip= f'Layer {i+1}')
+    dot.node(str(i), label=label, shape='record', style='filled', fillcolor='lightblue', tooltip= f'Layer {i+1}')
 
     #Connect it to the previous one
     if i > 0:
@@ -42,9 +44,19 @@ st.subheader('Model structure')
 st.graphviz_chart(dot.source)
 
 st.subheader('Training history')
-st.write()
+with open('models/history1.json', 'r') as f:
+    data = json.load(f)
+st.line_chart(data['history'], x_label='epoch', y_label='value')
 
 st.subheader('Test values')
+df_test = pd.DataFrame.from_dict(data['test'], orient='index').reset_index()
+df_test.columns = ['metric', 'value']
+
+bar = alt.Chart(df_test).mark_bar().encode(
+    x=alt.X('metric', axis=alt.Axis(labelAngle=0), title=''),
+    y=alt.Y('value', title='')
+)
+st.altair_chart(bar, use_container_width=True)
 
 with st.sidebar:
 

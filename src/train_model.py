@@ -61,16 +61,20 @@ model2.save('models/mnist_cnn2.keras')
 #Save info on model 1
 history1_data = {
     'history': history1.history,
-    'test_loss': test_loss1,
-    'test_accuracy': test_acc1
+    'test': {
+        'test_loss': test_loss1,
+        'test_accuracy': test_acc1
+    }
 }
 with open('models/history1.json', 'w') as f:
     json.dump(history1_data, f)
 #Save info on model 2
 history2_data = {
     'history': history2.history,
-    'test_loss': test_loss2,
-    'test_accuracy': test_acc2
+    'test': {
+        'test_loss': test_loss2,
+        'test_accuracy': test_acc2
+    }
 }
 with open('models/history2.json', 'w') as f:
     json.dump(history2_data, f)

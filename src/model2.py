@@ -1,6 +1,9 @@
+import json
 import streamlit as st
 from graphviz import Digraph
 from keras.models import load_model
+import pandas as pd
+import altair as alt
 
 def tuple_str(t):
     if len(t) == 1:
@@ -12,15 +15,6 @@ if 'model2' not in st.session_state:
     st.session_state.model2 = load_model(f'models/mnist_cnn2.keras')
 model = st.session_state.model2
 
-# tab1, tab2, tab3 = st.tabs(["Model structure", "Trainig history", 'Test values'])
-layers_info = [
-    {"name": "Input", "info": "Input layer, shape (28,28,1)"},
-    {"name": "Conv2D_1", "info": "Conv2D, 32 filtros, kernel 3x3, relu"},
-    {"name": "MaxPool", "info": "MaxPooling2D, 2x2"},
-    {"name": "Flatten", "info": "Flatten layer"},
-    {"name": "Dense", "info": "Dense layer, 10 unidades, linear"}
-]
-# Create diagram with the layers of the model
 dot = Digraph(format="svg")
 for i, layer in enumerate(model.layers):
     # Info of the layer
@@ -38,7 +32,7 @@ for i, layer in enumerate(model.layers):
                 {{ Input: {input_shape} | Output: {output_shape} }} }}'''
 
     # Create the layer
-    dot.node(str(i), label=label, shape="record", style="filled", fillcolor="lightblue", tooltip= f'Layer {i+1}')
+    dot.node(str(i), label=label, shape='record', style='filled', fillcolor='lightblue', tooltip=f'Layer {i + 1}')
 
     # Connect it to the previous one
     if i > 0:
@@ -48,9 +42,19 @@ st.subheader('Model structure')
 st.graphviz_chart(dot.source)
 
 st.subheader('Training history')
-st.write()
+with open('models/history2.json', 'r') as f:
+    data = json.load(f)
+st.line_chart(data['history'], x_label='epoch', y_label='value')
 
 st.subheader('Test values')
+df_test = pd.DataFrame.from_dict(data['test'], orient='index').reset_index()
+df_test.columns = ['metric', 'value']
+
+bar = alt.Chart(df_test).mark_bar().encode(
+    x=alt.X('metric', axis=alt.Axis(labelAngle=0), title=''),
+    y=alt.Y('value', title='')
+)
+st.altair_chart(bar, use_container_width=True)
 
 with st.sidebar:
     st.markdown('''<style>
