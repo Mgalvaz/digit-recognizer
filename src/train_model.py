@@ -1,8 +1,22 @@
+"""
+Train two different CNN models on the MNIST dataset, evaluate them,
+and save the models and their training history to the 'models' directory.
+"""
+
 import json, os
 from keras.losses import CategoricalCrossentropy
 from keras import layers, models
 from keras.datasets import mnist
 from keras.utils import to_categorical
+
+def save_history(history, test_loss, test_acc, filename):
+    data = {
+        'history': history.history,
+        'test': {'test_loss': test_loss, 'test_accuracy': test_acc}
+    }
+    with open(filename, 'w') as f:
+        json.dump(data, f)
+
 #Import the MNIST dataset
 (train_images, train_labels), (test_images, test_labels) = mnist.load_data()
 
@@ -14,8 +28,7 @@ test_images = test_images.reshape((-1, 28, 28, 1)).astype('float32')
 train_labels = to_categorical(train_labels)
 test_labels = to_categorical(test_labels)
 
-#Create the CNN model
-
+#Create both CNN models
 model1 = models.Sequential([
     layers.Input((28, 28, 1)),
     layers.Rescaling(1./255),
@@ -27,7 +40,6 @@ model1 = models.Sequential([
     layers.Dense(64, activation='relu'),
     layers.Dense(10, activation='linear')
     ])
-
 model2 = models.Sequential([
     layers.Input((28,28,1)),
     layers.Rescaling(1./255),
@@ -58,23 +70,6 @@ os.makedirs('models', exist_ok=True)
 model1.save('models/mnist_cnn1.keras')
 model2.save('models/mnist_cnn2.keras')
 
-#Save info on model 1
-history1_data = {
-    'history': history1.history,
-    'test': {
-        'test_loss': test_loss1,
-        'test_accuracy': test_acc1
-    }
-}
-with open('models/history1.json', 'w') as f:
-    json.dump(history1_data, f)
-#Save info on model 2
-history2_data = {
-    'history': history2.history,
-    'test': {
-        'test_loss': test_loss2,
-        'test_accuracy': test_acc2
-    }
-}
-with open('models/history2.json', 'w') as f:
-    json.dump(history2_data, f)
+#Save info
+save_history(history1, test_loss1, test_acc1, 'models/history1.json')
+save_history(history2, test_loss2, test_acc2, 'models/history2.json')
