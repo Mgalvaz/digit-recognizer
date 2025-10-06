@@ -8,45 +8,45 @@ from keras.models import load_model
 from tensorflow.nn import softmax
 from functools import partial
 
-THRESHOLD = 0.4 #Change this number if you want a different threshold
+THRESHOLD = 0.7 # Change this number if you want a different threshold. It should be in the range (0,1)
 
-#Reads the image drawn in the canvas and converts it to an array that can be fed to the CNN
+# Reads the image drawn in the canvas and converts it to an array that can be fed to the CNN
 def process_image(image_data):
     img = Image.fromarray(np.uint8(image_data[:, :, 0]))
     img = img.resize((28, 28)).convert('L')
     img = ImageOps.invert(img)
     return np.array(img).reshape(-1, 28, 28, 1).astype('float32')
 
-#Supage for single model option
+# Supage for single model option
 def single_model(model_key: str):
     model = st.session_state[model_key]
+    title = alt.TitleParams('Model 1' if model_key=='model1' else 'Model 2', anchor='middle')
 
-    #Prediction
+    # Prediction
     thr = st.sidebar.number_input('Threshold: ', 0.0, 1.0, value = THRESHOLD, disabled=True)
     if st.button('Predict'):
         if canvas_result.image_data is not None:
             img_array = process_image(canvas_result.image_data)
             with st.spinner('Predicting'):
 
-                #Digit prediction
+                # Digit prediction
                 pred = softmax(model.predict(img_array)).numpy()[0]
                 digit = np.argmax(pred)
-                st.session_state.pred_digit = digit if pred[digit] >= thr else None
-                if st.session_state.pred_digit is None:
+                if pred[digit] < thr:
                     st.write("There hasn't been a digit predicted with enough confidence.")
                 else:
-                    st.write(f'Predicted number: {st.session_state.pred_digit}, confidence: {np.max(pred):.2f}')
+                    st.write(f'Predicted number: {digit}, confidence: {pred[digit]:.2f}')
 
-                #Chart of digit probabilities
+                # Chart of digit probabilities
                 digits = list(range(10))
                 df = pd.DataFrame({
                     'Digit': digits,
                     'Probability': pred
                 })
-                bar = alt.Chart(df).mark_bar().encode(
+                bar = alt.Chart(df, title=title).mark_bar().encode(
                     x=alt.X('Digit:N', title='Digit', axis=alt.Axis(labelAngle=0)),
                     y=alt.Y('Probability:Q', title='Probability')
-                ).properties(width=10, height=300)
+                ).properties(width=10, height=300, title=title)
                 threshold_line = alt.Chart(pd.DataFrame({'y': [thr]})).mark_rule(
                     color='red',
                     strokeDash=[5, 5],
@@ -55,12 +55,12 @@ def single_model(model_key: str):
                 chart = bar + threshold_line
                 st.altair_chart(chart)
 
-#Subpage for arithmetic or geometric ensemble option
+# Subpage for arithmetic or geometric ensemble option
 def ensemble_model(arith: bool):
     model1 = st.session_state.model1
     model2 = st.session_state.model2
 
-    #Update functions for sidebar and number inputs
+    # Update functions for sidebar and number inputs
     def update_from_slider():
         st.session_state.alpha = st.session_state.alpha_slider
         st.session_state.beta = 1 - st.session_state.alpha_slider
@@ -77,7 +77,7 @@ def ensemble_model(arith: bool):
         st.session_state.alpha_num = st.session_state.alpha
         st.session_state.alpha_slider = st.session_state.alpha
 
-    #Selection of alpha (weight of model 1) and beta (weight of model 2)
+    # Selection of alpha (weight of model 1) and beta (weight of model 2)
     st.sidebar.slider('Weighted parameters (Model 1)', 0.0, 1.0, value=st.session_state.alpha, key='alpha_slider', on_change=update_from_slider)
     c1, c2 = st.sidebar.columns(2)
     c1.number_input('Model 1:', 0.0, 1.0, value=st.session_state.alpha, key='alpha_num', on_change=update_from_alpha_num)
@@ -85,30 +85,29 @@ def ensemble_model(arith: bool):
     alpha = st.session_state.alpha
     beta = st.session_state.beta
 
-    #Prediction
+    # Prediction
     thr = st.sidebar.number_input('Threshold: ', 0.0, 1.0, value = THRESHOLD, disabled=True)
     if st.button('Predict'):
         if canvas_result.image_data is not None:
-            #Digit prediction
+            # Digit prediction
             img_array = process_image(canvas_result.image_data)
             with st.spinner('Predicting'):
                 pred1 = softmax(model1.predict(img_array)).numpy()[0]
                 pred2 = softmax(model2.predict(img_array)).numpy()[0]
 
-                #Ensemble
+                # Ensemble
                 if arith:
                     combined_pred = alpha * pred1 + beta * pred2
                 else:
                     combined_pred = np.power(pred1, alpha) * np.power(pred2, beta)
                     combined_pred /= sum(combined_pred)
                 digit = np.argmax(combined_pred)
-                st.session_state.pred_digit = digit if combined_pred[digit] >= thr else None
-                if st.session_state.pred_digit is None:
+                if combined_pred[digit] < thr:
                     st.write("There hasn't been a digit predicted with enough confidence.")
                 else:
-                    st.write(f'Predicted number: {st.session_state.pred_digit}, confidence: {np.max(combined_pred):.2f}')
+                    st.write(f'Predicted number: {digit}, confidence: {combined_pred[digit]:.2f}')
 
-                #Create charts of digit probabilities for each model and for the ensemble one
+                # Create charts of digit probabilities for each model and for the ensemble one
                 digits = list(range(10))
                 df_models = pd.DataFrame({
                     'Digit': digits * 2,
@@ -119,23 +118,25 @@ def ensemble_model(arith: bool):
                     'Digit': digits,
                     'Probability': combined_pred
                 })
+                title_models = alt.TitleParams('Models', anchor='middle')
+                title_combined = alt.TitleParams('Ensemble', anchor='middle')
                 threshold_line = alt.Chart(pd.DataFrame({'y': [thr]})).mark_rule(
                     color='red',
                     strokeDash=[5, 5],
                     size=2
                 ).encode(y='y:Q')
-                bars = alt.Chart(df_models).mark_bar().encode(
+                bars_models = alt.Chart(df_models, title=title_models).mark_bar().encode(
                     x=alt.X('Digit:N', title='Digit', axis=alt.Axis(labelAngle=0)),
                     y=alt.Y('Probability:Q', title='Probability'),
                     color='Model:N',
                     xOffset='Model:N'
                 ).properties(width=30, height=300)
-                bars_combined = alt.Chart(df_combined).mark_bar(color='purple').encode(
+                bars_combined = alt.Chart(df_combined, title=title_combined).mark_bar(color='purple').encode(
                     x=alt.X('Digit:N', title='Digit', axis=alt.Axis(labelAngle=0)),
                     y=alt.Y('Probability:Q', title='Probability')
                 ).properties(width=30, height=300)
                 col1, col2 = st.columns(2)
-                chart_models = bars + threshold_line
+                chart_models = bars_models + threshold_line
                 chart_combined = bars_combined + threshold_line
                 col1.altair_chart(chart_models, use_container_width=True)
                 col2.altair_chart(chart_combined, use_container_width=True)

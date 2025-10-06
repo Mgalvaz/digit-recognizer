@@ -12,14 +12,14 @@ def tuple_str(t):
 
 def render_model_page(model_key: str, model_path: str, history_path: str):
 
-    #Load model if not yet loaded and its history
+    # Load model if not yet loaded and its history
     if model_key not in st.session_state:
         st.session_state[model_key] = load_model(model_path)
     model = st.session_state[model_key]
     with open(history_path, 'r') as f:
         data = json.load(f)
 
-    #Sidebar with links to the different sections of the page
+    # Sidebar with links to the different sections of the page
     with st.sidebar:
         st.html('''<style>
             body.nav-link {
@@ -61,15 +61,15 @@ def render_model_page(model_key: str, model_path: str, history_path: str):
         st.html("<a href='#training-history' class='nav-link'>Training history</a>")
         st.html("<a href='#test-values' class='nav-link'>Test values</a>")
 
-    #Diagram of the structure of the CNN
+    # Diagram of the structure of the CNN
     dot = Digraph(format="svg")
     for i, layer in enumerate(model.layers):
-        #Info of the layer
+        # Info of the layer
         input_shape = tuple_str(layer.input_shape[1:])
         output_shape = tuple_str(layer.output_shape[1:])
         params = layer.count_params()
 
-        #Structure of each layer
+        # Structure of each layer
         if params > 0:
             label = f'''{{ {layer.__class__.__name__} |
                     {{ Input: {input_shape} | Output: {output_shape} }} |
@@ -78,22 +78,22 @@ def render_model_page(model_key: str, model_path: str, history_path: str):
             label = f'''{{ {layer.__class__.__name__} |
                     {{ Input: {input_shape} | Output: {output_shape} }} }}'''
 
-        #Create the layer
+        # Create the layer
         dot.node(str(i), label=label, shape='record', style='filled', fillcolor='lightblue', tooltip= f'Layer {i+1}')
 
-        #Connect it to the previous one
+        # Connect it to the previous one
         if i > 0:
             dot.edge(str(i-1), str(i))
 
-    #Section structure of the model
+    # Section structure of the model
     st.subheader('Model structure')
     st.graphviz_chart(dot.source)
 
-    #Section training history
+    # Section training history
     st.subheader('Training history')
     st.line_chart(data['history'], x_label='epoch', y_label='value')
 
-    #Section test values
+    # Section test values
     st.subheader('Test values')
     df_test = pd.DataFrame.from_dict(data['test'], orient='index').reset_index()
     df_test.columns = ['metric', 'value']

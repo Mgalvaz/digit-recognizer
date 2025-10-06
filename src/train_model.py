@@ -17,18 +17,18 @@ def save_history(history, test_loss, test_acc, filename):
     with open(filename, 'w') as f:
         json.dump(data, f)
 
-#Import the MNIST dataset
+# Import the MNIST dataset
 (train_images, train_labels), (test_images, test_labels) = mnist.load_data()
 
-#Modify the images so that layers can "understand" the data
+# Modify the images so that layers can "understand" the data
 train_images = train_images.reshape((-1, 28, 28, 1)).astype('float32')
 test_images = test_images.reshape((-1, 28, 28, 1)).astype('float32')
 
-#Labels one-hot encoding
+# Labels one-hot encoding
 train_labels = to_categorical(train_labels)
 test_labels = to_categorical(test_labels)
 
-#Create both CNN models
+# Create both CNN models
 model1 = models.Sequential([
     layers.Input((28, 28, 1)),
     layers.Rescaling(1./255),
@@ -55,21 +55,21 @@ model2 = models.Sequential([
     layers.Dense(10, activation='linear')
 ])
 
-#Train the model
+# Train the model
 model1.compile(optimizer='adam', loss=CategoricalCrossentropy(from_logits=True), metrics=['accuracy'])
 model2.compile(optimizer='adam', loss=CategoricalCrossentropy(from_logits=True), metrics=['accuracy'])
 history1 = model1.fit(train_images, train_labels, epochs=5, batch_size=64, validation_split=0.1)
 history2 = model2.fit(train_images, train_labels, epochs=5, batch_size=64, validation_split=0.1)
 
-#Evaluate the model
+# Evaluate the model
 test_loss1, test_acc1 = model1.evaluate(test_images, test_labels)
 test_loss2, test_acc2 = model2.evaluate(test_images, test_labels)
 
-#Save the model
+# Save the model
 os.makedirs('models', exist_ok=True)
 model1.save('models/mnist_cnn1.keras')
 model2.save('models/mnist_cnn2.keras')
 
-#Save info
+# Save info
 save_history(history1, test_loss1, test_acc1, 'models/history1.json')
 save_history(history2, test_loss2, test_acc2, 'models/history2.json')
