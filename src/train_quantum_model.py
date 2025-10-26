@@ -5,7 +5,7 @@ from keras.datasets import mnist
 from qiskit import QuantumCircuit
 from qiskit.circuit import ParameterVector
 import matplotlib.pyplot as plt
-from qiskit.circuit.library import ZZFeatureMap, TwoLocal
+from qiskit.circuit.library import ZZFeatureMap
 
 # Get a portion of the MNIST dataset and reduce the number of features
 def preprocess_data(num_features=16, size_train=2000, test=0.25):
