@@ -1,5 +1,3 @@
-import os
-import json
 import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
@@ -37,8 +35,12 @@ def feature_map(num_qubits=8):
         qc.rz(x[2*i+1], i)
     for i in range(num_qubits-1):
         qc.cx(i, i+1)
-        qc.p(2*(-np.pi+x[2*(i+1)+1])*(-np.pi+x[2*i+1]),i+1)
+        qc.p(2*(-np.pi+x[2*i+3])*(-np.pi+x[2*i+1]),i+1)
         qc.cx(i, i+1)
+    if num_qubits > 0:
+        qc.cx(num_qubits-1, 0)
+        qc.p(2 * (-np.pi + x[1]) * (-np.pi + x[2*num_qubits-1]), 0)
+        qc.cx(num_qubits-1, 0)
     return qc
 
 encoding = feature_map()
