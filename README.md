@@ -92,21 +92,22 @@ After that, you can run the app:
 ```
 digit-recognizer/
 │
-├── models/               # Trained models al training history
-│   ├── mnist_cnn1.keras  # Model 1
-│   ├── mnist_cnn2.keras  # Model 2
-│   ├── history1.json     # Trainig history of model 1
-│   └── history2.json     # Trainig history of model 1
+├── models/                       # Trained models al training history
+│   ├── mnist_cnn1.keras          # Model 1
+│   ├── mnist_cnn2.keras          # Model 2
+│   ├── history1.json             # Trainig history of model 1
+│   └── history2.json             # Trainig history of model 1
 │
-├── src/                  # Source code 
-│   ├── app.py            # Streamlit navigation and page management
-│   ├── recognizer.py     # Digit drawing canvas and model predictions
-│   ├── model1.py         # Page with Model 1 details
-│   ├── model2.py         # Page with Model 2 details
-│   ├── model_view.py     # Shared visualization utilities (plots, diagrams)
-│   └── train_model.py    # Model training script (creates .keras and .json files)
+├── src/                          # Source code 
+│   ├── app.py                    # Streamlit navigation and page management
+│   ├── recognizer.py             # Digit drawing canvas and model predictions
+│   ├── model1.py                 # Page with Model 1 details
+│   ├── model2.py                 # Page with Model 2 details
+│   ├── model_view.py             # Shared visualization utilities (plots, diagrams)
+│   ├── train_classical_model.py  # Model training script (creates .keras and .json files)
+│   └── train_quantum_model.py    # Model training script (creates .keras and .json files)
 │
-├── img/                  # GIFs for README
+├── img/                          # GIFs for README
 │   ├── demo_drawing.gif
 │   └── demo_models.gif
 │
