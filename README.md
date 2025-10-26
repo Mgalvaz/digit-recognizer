@@ -53,7 +53,7 @@ Both are trained on the MNIST dataset for 5 epochs using Adam optimizer and cate
 | **Model 1** |      99%      |  0.0309   |
 | **Model 2** |    99.19%     |  0.0258   |
 
-After training, both models are tested on a 10% hold-out portion of the MNIST dataset, achieving around 99% accuracy.
+After training, both models are tested on a 10% hold-out portion of the MNIST dataset, achieving over 99% accuracy.
 
 Results may slightly vary between runs due to TensorFlow’s random weight initialization and stochastic training process.
 
