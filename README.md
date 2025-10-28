@@ -39,21 +39,20 @@ A smaller CNN with:
 
 ### Model 2
 A deeper CNN featuring:
-- Three convolutional layers 
-- Two pooling layers 
+- Three convolutional and pooling layers
 - Dropout for regularization
 - One dense hidden layer
-- About 300k parameters  
+- About 150k parameters  
 
 Both are trained on the MNIST dataset for 5 epochs using Adam optimizer and categorical cross-entropy loss.
 
 ### Accuracy
 |             | Test accuracy | Test loss |
 |-------------|:-------------:|:---------:|
-| **Model 1** |      99%      |  0.0309   |
-| **Model 2** |    99.19%     |  0.0258   |
+| **Model 1** |    98.83%     |  0.0313   |
+| **Model 2** |    99.19%     |  0.0218   |
 
-After training, both models are tested on a 10% hold-out portion of the MNIST dataset, achieving over 99% accuracy.
+After training, both models are tested on a 10% hold-out portion of the MNIST dataset, achieving around 99% accuracy.
 
 Results may slightly vary between runs due to TensorFlow’s random weight initialization and stochastic training process.
 
@@ -92,20 +91,22 @@ After that, you can run the app:
 ```
 digit-recognizer/
 │
-├── models/                       # Trained models al training history
-│   ├── mnist_cnn1.keras          # Model 1
-│   ├── mnist_cnn2.keras          # Model 2
-│   ├── history1.json             # Trainig history of model 1
-│   └── history2.json             # Trainig history of model 1
+├── models/                         # Trained models al training history
+│   ├── mnist_cnn1.keras            # Model 1
+│   ├── mnist_cnn2.keras            # Model 2
+│   ├── history1.json               # Trainig history of model 1
+│   └── history2.json               # Trainig history of model 1
 │
-├── src/                          # Source code 
-│   ├── app.py                    # Streamlit navigation and page management
-│   ├── recognizer.py             # Digit drawing canvas and model predictions
-│   ├── model1.py                 # Page with Model 1 details
-│   ├── model2.py                 # Page with Model 2 details
-│   ├── model_view.py             # Shared visualization utilities (plots, diagrams)
-│   ├── train_classical_model.py  # Model training script (creates .keras and .json files)
-│   └── train_quantum_model.py    # Model training script (creates .keras and .json files)
+├── src/                            # Source code 
+│   ├── app.py                      # Streamlit navigation and page management
+│   ├── recognizer.py               # Digit drawing canvas and model predictions
+│   ├── model1.py                   # Page with Model 1 details
+│   ├── model2.py                   # Page with Model 2 details
+│   ├── model_view.py               # Shared visualization utilities (plots, diagrams)
+│   ├── train_classical_model.ipynb # Classical model training script in jupyter notebook
+│   ├── train_classical_model.py    # Classical model training script (creates .keras and .json files)
+│   ├── train_quantum_model.ipynb   # Quantum model training script in jupyter notebook
+│   └── train_quantum_model.py      # Quantum model training script 
 │
 ├── img/                          # GIFs for README
 │   ├── demo_drawing.gif

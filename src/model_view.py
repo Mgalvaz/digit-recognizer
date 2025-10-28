@@ -64,18 +64,18 @@ def render_model_page(model_key: str, model_path: str, history_path: str):
     # Diagram of the structure of the CNN
     dot = Digraph(format="svg")
     for i, layer in enumerate(model.layers):
-        # Info of the layer
-        input_shape = tuple_str(layer.input_shape[1:])
-        output_shape = tuple_str(layer.output_shape[1:])
+        layer_type = layer.__class__.__name__
+        input_shape = tuple_str(layer.input.shape[1:])
+        output_shape = tuple_str(layer.output.shape[1:])
         params = layer.count_params()
 
         # Structure of each layer
         if params > 0:
-            label = f'''{{ {layer.__class__.__name__} |
+            label = f'''{{ {layer_type} |
                     {{ Input: {input_shape} | Output: {output_shape} }} |
                     Params: {params} }}'''
         else:
-            label = f'''{{ {layer.__class__.__name__} |
+            label = f'''{{ {layer_type} |
                     {{ Input: {input_shape} | Output: {output_shape} }} }}'''
 
         # Create the layer
