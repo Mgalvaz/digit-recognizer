@@ -8,14 +8,14 @@ from sklearn.preprocessing import StandardScaler
 from keras.datasets import mnist
 from qiskit import QuantumCircuit
 from qiskit.circuit import ParameterVector
-from qiskit_machine_learning.neural_networks import EstimatorQNN
-from qiskit.primitives import StatevectorEstimator as Estimator
-from qiskit_machine_learning.gradients import ParamShiftEstimatorGradient
+from qiskit_machine_learning.neural_networks import SamplerQNN
+from qiskit.primitives import StatevectorSampler as Sampler
 import matplotlib.pyplot as plt
 
 
 # Get a portion of the MNIST dataset and reduce the number of features
 def preprocess_data(input_features, output_qubits, size_train=2000, test=0.25):
+    size_test = int(size_train * test)
     (train_images, train_labels), (test_images, test_labels) = mnist.load_data()
     train_images = train_images.reshape((train_images.shape[0], -1)) / 255.0
     test_images = test_images.reshape((test_images.shape[0], -1)) / 255.0
@@ -31,12 +31,13 @@ def preprocess_data(input_features, output_qubits, size_train=2000, test=0.25):
     train_images = train_images * 2 * np.pi
     test_images = test_images * 2 * np.pi
 
-    train_labels = np.array([[int(b) for b in np.binary_repr(l, width=output_qubits)] for l in train_labels])
-    test_labels = np.array([[int(b) for b in np.binary_repr(l, width=output_qubits)] for l in test_labels])
-    train_labels = 1 - 2 * train_labels
-    test_labels = 1 - 2 * test_labels
-
-    size_test = int(size_train * test)
+    """lsize = 1<<output_qubits
+    train_labels_onehot = np.zeros((size_train, lsize))
+    test_labels_onehot =np.zeros((size_test, lsize))
+    for i, lbl in enumerate(train_labels[:size_train]):
+        train_labels_onehot[i, lbl] = 1
+    for i, lbl in enumerate(test_labels[:size_test]):
+        test_labels_onehot[i, lbl] = 1"""
     return (train_images[:size_train], train_labels[:size_train]), (test_images[:size_test], test_labels[:size_test])
 
 def denseZZ_feature_map(num_features, param_name):
@@ -88,8 +89,8 @@ def convolutional_circuit(num_qubits, parameter_name):
 def callback_func(weights, loss):
     losses.append(loss)
 
-# Estimator for the measurements
-estimator = Estimator()
+def interpreter(x):
+    return int(format(x, '04b')[-4:], base=2)
 
 # Feature map to encode classical data into qubits
 feature_map = denseZZ_feature_map(16, 'x')
@@ -111,22 +112,29 @@ QCNN.compose(ansatz, range(8), inplace=True)
 #img_pool = pool_circuit(range(1), range(1, 2), 'P').decompose().draw('mpl')
 #plt.show()
 
-# Observabes for the measurement, since there are 10 classes, we need 4 bits
-observable = []
-for j in range(4):
-    obs = SparsePauliOp.from_list([('I' * j + 'Z' + 'I' * (7 - j), 1)])
-    observable.append(obs)
-
-qnn = EstimatorQNN(
+qnn = SamplerQNN(
     circuit=QCNN.decompose(),
-    observables=observable,
     input_params=feature_map.parameters,
     weight_params=ansatz.parameters,
-    estimator=estimator,
-    gradient=ParamShiftEstimatorGradient(estimator=estimator),
-    num_virtual_qubits=8
+    interpret=interpreter,
+    output_shape=16,
+    sampler=Sampler()
 )
 
 losses = []
-classifier = NeuralNetworkClassifier(qnn, optimizer=COBYLA(maxiter=200), callback=callback_func)
-(train_x, train_y), (test_x, test_y) = preprocess_data(16,4, size_train=10)
+classifier = NeuralNetworkClassifier(qnn, optimizer=COBYLA(maxiter=400), callback=callback_func)
+(train_x, train_y), (test_x, test_y) = preprocess_data(16,4, size_train=2000)
+"""print("Train X shape:", np.shape(train_x))
+print("Train Y shape:", np.shape(train_y))
+print("QNN output shape:", qnn.output_shape)
+sample_output = qnn.forward(train_x[0], np.random.random(len(qnn.weight_params)))
+print("QNN sample output:", sample_output)
+print("Sample output shape:", np.shape(sample_output))"""
+
+classifier.fit(train_x, train_y)
+print(classifier.score(test_x, test_y))
+plt.title("Loss against iteration")
+plt.xlabel("Iteration")
+plt.ylabel("Loss")
+plt.plot(range(len(losses)), losses)
+plt.show()
