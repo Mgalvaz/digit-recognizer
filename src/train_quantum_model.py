@@ -2,14 +2,18 @@ import numpy as np
 from qiskit.circuit.library import efficient_su2
 from qiskit.quantum_info import SparsePauliOp
 from qiskit_machine_learning.algorithms import NeuralNetworkClassifier
+from qiskit_machine_learning.gradients import ParamShiftEstimatorGradient
 from qiskit_machine_learning.optimizers import COBYLA
+from qiskit_machine_learning.utils import algorithm_globals
+from qiskit_machine_learning.utils.loss_functions import L2Loss
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from keras.datasets import mnist
 from qiskit import QuantumCircuit
 from qiskit.circuit import ParameterVector
-from qiskit_machine_learning.neural_networks import SamplerQNN
+from qiskit_machine_learning.neural_networks import SamplerQNN, EstimatorQNN
 from qiskit.primitives import StatevectorSampler as Sampler
+from qiskit.primitives import StatevectorEstimator as Estimator
 import matplotlib.pyplot as plt
 
 
@@ -31,13 +35,10 @@ def preprocess_data(input_features, output_qubits, size_train=2000, test=0.25):
     train_images = train_images * 2 * np.pi
     test_images = test_images * 2 * np.pi
 
-    """lsize = 1<<output_qubits
-    train_labels_onehot = np.zeros((size_train, lsize))
-    test_labels_onehot =np.zeros((size_test, lsize))
-    for i, lbl in enumerate(train_labels[:size_train]):
-        train_labels_onehot[i, lbl] = 1
-    for i, lbl in enumerate(test_labels[:size_test]):
-        test_labels_onehot[i, lbl] = 1"""
+    # Map a number from 0 to 9 to its binary representation of 4 bits, and then each 0 to 1 and each 1 to -1
+    train_labels = 1 - 2*np.array([list(map(int, format(label, '04b'))) for label in train_labels])
+    test_labels = 1 - 2*np.array([list(map(int, format(label, '04b'))) for label in test_labels])
+
     return (train_images[:size_train], train_labels[:size_train]), (test_images[:size_test], test_labels[:size_test])
 
 def denseZZ_feature_map(num_features, param_name):
@@ -92,6 +93,12 @@ def callback_func(weights, loss):
 def interpreter(x):
     return int(format(x, '04b')[-4:], base=2)
 
+def cost_func_domain(weights):
+    predictions = qnn.forward(train_x, weights)
+    cost = np.mean(mse(predictions, train_y))
+    callback_func(weights, cost)
+    return cost
+
 # Feature map to encode classical data into qubits
 feature_map = denseZZ_feature_map(16, 'x')
 
@@ -106,33 +113,47 @@ QCNN = QuantumCircuit(8)
 QCNN.compose(feature_map, range(8), inplace=True)
 QCNN.compose(ansatz, range(8), inplace=True)
 
+# Observable
+observables = []
+for j in range(4):
+    obs = SparsePauliOp.from_list([('I'*j + 'Z' + 'I'*(7-j), 1)])
+    observables.append(obs)
+
 #img_full = QCNN.draw('mpl', scale=0.6, fold=30)
 #img_fm = feature_map(16, 'X').decompose().draw('mpl', scale=0.6)
 #img_conv = convolutional_circuit(8, 'C').decompose().draw('mpl')
 #img_pool = pool_circuit(range(1), range(1, 2), 'P').decompose().draw('mpl')
 #plt.show()
 
-qnn = SamplerQNN(
+qnn = EstimatorQNN(
     circuit=QCNN.decompose(),
+    estimator=Estimator(),
+    observables=observables,
     input_params=feature_map.parameters,
     weight_params=ansatz.parameters,
-    interpret=interpreter,
-    output_shape=16,
-    sampler=Sampler()
+    gradient=ParamShiftEstimatorGradient(Estimator()),
+    num_virtual_qubits=8
 )
 
 losses = []
-classifier = NeuralNetworkClassifier(qnn, optimizer=COBYLA(maxiter=400), callback=callback_func)
-(train_x, train_y), (test_x, test_y) = preprocess_data(16,4, size_train=2000)
+optimizer = COBYLA(maxiter=20)
+initial_point = algorithm_globals.random.random(qnn.num_weights)
+mse = L2Loss()
+(train_x, train_y), (test_x, test_y) = preprocess_data(16,4, size_train=10)
+opt_result = optimizer.minimize(cost_func_domain, initial_point)
+print(np.sum(np.all(np.sign(qnn.forward(test_x, opt_result.x)) == test_y, axis=1)))
+#classifier = NeuralNetworkClassifier(qnn, optimizer=COBYLA(maxiter=20), callback=callback_func)
+
 """print("Train X shape:", np.shape(train_x))
 print("Train Y shape:", np.shape(train_y))
 print("QNN output shape:", qnn.output_shape)
-sample_output = qnn.forward(train_x[0], np.random.random(len(qnn.weight_params)))
+sample_output = qnn.forward(train_x, np.random.random(len(qnn.weight_params)))
 print("QNN sample output:", sample_output)
 print("Sample output shape:", np.shape(sample_output))"""
 
-classifier.fit(train_x, train_y)
-print(classifier.score(test_x, test_y))
+#classifier.fit(train_x, train_y)
+#print(classifier.score(test_x, test_y))
+
 plt.title("Loss against iteration")
 plt.xlabel("Iteration")
 plt.ylabel("Loss")
