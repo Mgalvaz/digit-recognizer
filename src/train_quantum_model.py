@@ -4,11 +4,11 @@ import numpy as np
 from PIL import ImageOps, Image
 from qiskit.circuit.library import efficient_su2
 from qiskit.quantum_info import SparsePauliOp
-from qiskit_machine_learning.algorithms import NeuralNetworkClassifier
+from qiskit_machine_learning.algorithms import NeuralNetworkClassifier, VQC
 from qiskit_machine_learning.gradients import ParamShiftEstimatorGradient
 from qiskit_machine_learning.optimizers import COBYLA
 from qiskit_machine_learning.utils import algorithm_globals
-from qiskit_machine_learning.utils.loss_functions import L2Loss
+from qiskit_machine_learning.utils.loss_functions import L2Loss, CrossEntropyLoss
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from keras.datasets import mnist
@@ -24,6 +24,8 @@ import matplotlib.pyplot as plt
 # Get a portion of the MNIST dataset and reduce the number of features
 def preprocess_data(input_features, output_qubits, size_train=2000, test=0.25):
     size_test = int(size_train * test)
+    n_train = np.random.randint(0, 59999-size_train)
+    n_test = np.random.randint(0, 9999-size_test)
     (train_images, train_labels), (test_images, test_labels) = mnist.load_data()
     train_images = train_images.reshape((train_images.shape[0], -1))
     test_images = test_images.reshape((test_images.shape[0], -1))
@@ -48,16 +50,20 @@ def preprocess_data(input_features, output_qubits, size_train=2000, test=0.25):
     train_images = pca.fit_transform(train_images)
     test_images = pca.transform(test_images)"""
 
-    train_images = train_images[:size_train]
-    test_images = test_images[:size_test]
-    train_labels = train_labels[:size_train]
-    test_labels = test_labels[:size_test]
+    train_images = train_images[n_train:n_train+size_train]
+    test_images = test_images[n_test:n_test+size_test]
+    train_labels = train_labels[n_train:n_train+size_train]
+    test_labels = test_labels[n_test:n_test+size_test]
 
     train_images = np.array([reduce_image(img, 10) for img in train_images])
     test_images = np.array([reduce_image(img, 10) for img in test_images])
 
+    print(train_images[0])
+
     train_images = train_images * 2 * np.pi
     test_images = test_images * 2 * np.pi
+
+    print(train_images[0])
 
     """# Map a number from 0 to 9 to its binary representation of 4 bits, and then each 0 to 1 and each 1 to -1
     train_labels = 1 - 2*np.array([list(map(int, format(label, '04b'))) for label in train_labels])
@@ -107,7 +113,16 @@ def pool_circuit(origin, target, param_name):
     return qc
 
 def convolutional_circuit(num_qubits, parameter_name):
-    qc = efficient_su2(num_qubits, reps=2, parameter_prefix=parameter_name, name='Convolutional Layer')
+    qc = QuantumCircuit(num_qubits)
+
+    qc.cx(1, 0)
+    qc.rz(params[0], 0)
+    qc.ry(params[1], 1)
+    qc.cx(0, 1)
+    qc.ry(params[2], 1)
+    qc.cx(1, 0)
+    qc.rz(np.pi / 2, 0)
+
     qc_inst = qc.to_instruction()
     qc = QuantumCircuit(num_qubits)
     qc.append(qc_inst, range(num_qubits))
@@ -118,11 +133,18 @@ def callback_func(weights, loss):
     losses.append(loss)
 
 def interpreter(x):
-    return max(x.bit_length()-1, 0)
+    bits = format(x, '010b')
+    return bits[::-1].find('1') if '1' in bits else 0
 
 def cost_func_domain(weights):
     predictions = qnn.forward(train_x, weights)
     cost = np.mean(mse(predictions, train_y))
+    callback_func(weights, cost)
+    return cost
+
+def cost_func_domain2(weights):
+    predictions = qnn.forward(train_x, weights)
+    cost = np.linalg.norm(cse(predictions, train_y))
     callback_func(weights, cost)
     return cost
 
@@ -179,13 +201,26 @@ qnn = SamplerQNN(
     output_shape=10
 )
 
+vqc = VQC(
+    num_qubits=10,
+    feature_map=feature_map.decompose(),
+    ansatz=ansatz.decompose(),
+    optimizer=COBYLA(maxiter=50),
+    callback=callback_func,
+    sampler=Sampler()
+)
+
 losses = []
 optimizer = COBYLA(maxiter=50)
 initial_point = algorithm_globals.random.random(qnn.num_weights)
 mse = L2Loss()
-(train_x, train_y), (test_x, test_y) = preprocess_data(16,4, size_train=1)
-#opt_result = optimizer.minimize(cost_func_domain, initial_point)
-#print(np.sum(np.all(np.sign(qnn.forward(test_x, opt_result.x)) == test_y, axis=1)))
+cse = CrossEntropyLoss()
+(train_x, train_y), (test_x, test_y) = preprocess_data(16,4, size_train=50)
+#vqc.fit(train_x, train_y)
+#print(vqc.score(test_x, test_y))
+#opt_result = optimizer.minimize(cost_func_domain2, initial_point)
+#print(np.sum(np.argmax(qnn.forward(test_x, opt_result.x), axis=1) == np.argmax(test_y, axis=1)))
+#print(np.argmax(qnn.forward(test_x, opt_result.x), axis=1)==test_y)
 #classifier = NeuralNetworkClassifier(qnn, optimizer=COBYLA(maxiter=20), callback=callback_func)
 
 """print("Train X shape:", np.shape(train_x))
