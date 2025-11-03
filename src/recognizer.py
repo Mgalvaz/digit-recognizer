@@ -15,7 +15,7 @@ def process_image(image_data):
     img = Image.fromarray(np.uint8(image_data[:, :, 0]))
     img = img.resize((28, 28)).convert('L')
     img = ImageOps.invert(img)
-    return np.array(img).reshape(-1, 28, 28, 1).astype('float32')
+    return np.asarray(img).reshape(-1, 28, 28, 1).astype('float32')
 
 # Supage for single model option
 def single_model(model_key: str):

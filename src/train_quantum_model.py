@@ -1,4 +1,7 @@
+import random
+
 import numpy as np
+from PIL import ImageOps, Image
 from qiskit.circuit.library import efficient_su2
 from qiskit.quantum_info import SparsePauliOp
 from qiskit_machine_learning.algorithms import NeuralNetworkClassifier
@@ -9,11 +12,12 @@ from qiskit_machine_learning.utils.loss_functions import L2Loss
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from keras.datasets import mnist
+from keras.utils import to_categorical
 from qiskit import QuantumCircuit
 from qiskit.circuit import ParameterVector
 from qiskit_machine_learning.neural_networks import SamplerQNN, EstimatorQNN
-from qiskit.primitives import StatevectorSampler as Sampler
-from qiskit.primitives import StatevectorEstimator as Estimator
+from qiskit_aer.primitives import SamplerV2 as Sampler
+from qiskit_aer.primitives import EstimatorV2 as Estimator
 import matplotlib.pyplot as plt
 
 
@@ -21,25 +25,48 @@ import matplotlib.pyplot as plt
 def preprocess_data(input_features, output_qubits, size_train=2000, test=0.25):
     size_test = int(size_train * test)
     (train_images, train_labels), (test_images, test_labels) = mnist.load_data()
-    train_images = train_images.reshape((train_images.shape[0], -1)) / 255.0
-    test_images = test_images.reshape((test_images.shape[0], -1)) / 255.0
+    train_images = train_images.reshape((train_images.shape[0], -1))
+    test_images = test_images.reshape((test_images.shape[0], -1))
 
-    scaler = StandardScaler()
+    def reduce_image(img, threshold=10):
+        img = img.reshape((28, 28))
+        img = Image.fromarray(img.astype(np.uint8))
+        coords = np.argwhere(np.asarray(img) > threshold)
+        y0, x0 = coords.min(axis=0)
+        y1, x1 = coords.max(axis=0) + 1
+        img = img.crop((x0, y0, x1, y1))
+        img = img.convert('L')
+        img = ImageOps.invert(img)
+        img = img.resize((4, 5))
+        return np.asarray(img).flatten()/255.
+
+    """scaler = StandardScaler()
     train_images = scaler.fit_transform(train_images)
     test_images = scaler.transform(test_images)
 
     pca = PCA(n_components=input_features)
     train_images = pca.fit_transform(train_images)
-    test_images = pca.transform(test_images)
+    test_images = pca.transform(test_images)"""
+
+    train_images = train_images[:size_train]
+    test_images = test_images[:size_test]
+    train_labels = train_labels[:size_train]
+    test_labels = test_labels[:size_test]
+
+    train_images = np.array([reduce_image(img, 10) for img in train_images])
+    test_images = np.array([reduce_image(img, 10) for img in test_images])
 
     train_images = train_images * 2 * np.pi
     test_images = test_images * 2 * np.pi
 
-    # Map a number from 0 to 9 to its binary representation of 4 bits, and then each 0 to 1 and each 1 to -1
+    """# Map a number from 0 to 9 to its binary representation of 4 bits, and then each 0 to 1 and each 1 to -1
     train_labels = 1 - 2*np.array([list(map(int, format(label, '04b'))) for label in train_labels])
-    test_labels = 1 - 2*np.array([list(map(int, format(label, '04b'))) for label in test_labels])
+    test_labels = 1 - 2*np.array([list(map(int, format(label, '04b'))) for label in test_labels])"""
 
-    return (train_images[:size_train], train_labels[:size_train]), (test_images[:size_test], test_labels[:size_test])
+    train_labels = to_categorical(train_labels, num_classes=10)
+    test_labels = to_categorical(test_labels, num_classes=10)
+
+    return (train_images, train_labels), (test_images, test_labels)
 
 def denseZZ_feature_map(num_features, param_name):
     num_qubits = num_features // 2
@@ -91,7 +118,7 @@ def callback_func(weights, loss):
     losses.append(loss)
 
 def interpreter(x):
-    return int(format(x, '04b')[-4:], base=2)
+    return max(x.bit_length()-1, 0)
 
 def cost_func_domain(weights):
     predictions = qnn.forward(train_x, weights)
@@ -100,18 +127,25 @@ def cost_func_domain(weights):
     return cost
 
 # Feature map to encode classical data into qubits
-feature_map = denseZZ_feature_map(16, 'x')
+"""feature_map = denseZZ_feature_map(16, 'x')"""
+feature_map = denseZZ_feature_map(20, 'x')
 
 # VQC ansatz composed of convolutional with pooling layers
-ansatz = QuantumCircuit(8)
+"""ansatz = QuantumCircuit(8)
 ansatz.compose(convolutional_circuit(8, 'c1'), range(8), inplace=True)
 ansatz.compose(pool_circuit(range(4), range(4, 8), 'p1'), range(8), inplace=True)
-ansatz.compose(convolutional_circuit(4, 'c2'), range(4, 8), inplace=True)
+ansatz.compose(convolutional_circuit(4, 'c2'), range(4, 8), inplace=True)"""
+
+ansatz = QuantumCircuit(10)
+ansatz.compose(convolutional_circuit(10,'c'), range(10), inplace=True)
 
 # Full circuit
-QCNN = QuantumCircuit(8)
+"""QCNN = QuantumCircuit(8)
 QCNN.compose(feature_map, range(8), inplace=True)
-QCNN.compose(ansatz, range(8), inplace=True)
+QCNN.compose(ansatz, range(8), inplace=True)"""
+QCNN = QuantumCircuit(10)
+QCNN.compose(feature_map, range(10), inplace=True)
+QCNN.compose(ansatz, range(10), inplace=True)
 
 # Observable
 observables = []
@@ -125,7 +159,7 @@ for j in range(4):
 #img_pool = pool_circuit(range(1), range(1, 2), 'P').decompose().draw('mpl')
 #plt.show()
 
-qnn = EstimatorQNN(
+"""qnn = EstimatorQNN(
     circuit=QCNN.decompose(),
     estimator=Estimator(),
     observables=observables,
@@ -133,15 +167,25 @@ qnn = EstimatorQNN(
     weight_params=ansatz.parameters,
     gradient=ParamShiftEstimatorGradient(Estimator()),
     num_virtual_qubits=8
+)"""
+
+qnn = SamplerQNN(
+    circuit=QCNN.decompose(),
+    num_virtual_qubits=10,
+    sampler=Sampler(),
+    input_params=feature_map.parameters,
+    weight_params=ansatz.parameters,
+    interpret=interpreter,
+    output_shape=10
 )
 
 losses = []
-optimizer = COBYLA(maxiter=20)
+optimizer = COBYLA(maxiter=50)
 initial_point = algorithm_globals.random.random(qnn.num_weights)
 mse = L2Loss()
-(train_x, train_y), (test_x, test_y) = preprocess_data(16,4, size_train=10)
-opt_result = optimizer.minimize(cost_func_domain, initial_point)
-print(np.sum(np.all(np.sign(qnn.forward(test_x, opt_result.x)) == test_y, axis=1)))
+(train_x, train_y), (test_x, test_y) = preprocess_data(16,4, size_train=1)
+#opt_result = optimizer.minimize(cost_func_domain, initial_point)
+#print(np.sum(np.all(np.sign(qnn.forward(test_x, opt_result.x)) == test_y, axis=1)))
 #classifier = NeuralNetworkClassifier(qnn, optimizer=COBYLA(maxiter=20), callback=callback_func)
 
 """print("Train X shape:", np.shape(train_x))
