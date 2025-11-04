@@ -22,7 +22,7 @@ import matplotlib.pyplot as plt
 
 
 # Get a portion of the MNIST dataset and reduce the number of features
-def preprocess_data(input_features, output_qubits, size_train=2000, test=0.25):
+def preprocess_data(input_features, output, size_train=2000, test=0.25):
     size_test = int(size_train * test)
     n_train = np.random.randint(0, 59999-size_train)
     n_test = np.random.randint(0, 9999-size_test)
@@ -38,7 +38,6 @@ def preprocess_data(input_features, output_qubits, size_train=2000, test=0.25):
         y1, x1 = coords.max(axis=0) + 1
         img = img.crop((x0, y0, x1, y1))
         img = img.convert('L')
-        img = ImageOps.invert(img)
         img = img.resize((4, 5))
         return np.asarray(img).flatten()/255.
 
@@ -58,19 +57,16 @@ def preprocess_data(input_features, output_qubits, size_train=2000, test=0.25):
     train_images = np.array([reduce_image(img, 10) for img in train_images])
     test_images = np.array([reduce_image(img, 10) for img in test_images])
 
-    print(train_images[0])
-
     train_images = train_images * 2 * np.pi
     test_images = test_images * 2 * np.pi
-
-    print(train_images[0])
 
     """# Map a number from 0 to 9 to its binary representation of 4 bits, and then each 0 to 1 and each 1 to -1
     train_labels = 1 - 2*np.array([list(map(int, format(label, '04b'))) for label in train_labels])
     test_labels = 1 - 2*np.array([list(map(int, format(label, '04b'))) for label in test_labels])"""
 
-    train_labels = to_categorical(train_labels, num_classes=10)
-    test_labels = to_categorical(test_labels, num_classes=10)
+    if output =='one_hot':
+        train_labels = to_categorical(train_labels, num_classes=10)
+        test_labels = to_categorical(test_labels, num_classes=10)
 
     return (train_images, train_labels), (test_images, test_labels)
 
@@ -79,15 +75,16 @@ def denseZZ_feature_map(num_features, param_name):
     qc = QuantumCircuit(num_qubits, name='Encoding')
     x = ParameterVector(param_name, length=num_features)
     for i in range(num_qubits):
+        qc.h(i)
         qc.ry(x[2 * i], i)
         qc.rz(x[2 * i + 1], i)
     for i in range(num_qubits - 1):
         qc.cx(i, i + 1)
-        qc.p(2 * (-np.pi + x[2 * i + 3]) * (-np.pi + x[2 * i + 1]), i + 1)
+        qc.rz(x[2 * i + 3] + x[2 * i + 1], i + 1)
         qc.cx(i, i + 1)
     if num_qubits > 0:
         qc.cx(num_qubits - 1, 0)
-        qc.p(2 * (-np.pi + x[1]) * (-np.pi + x[2 * num_qubits - 1]), 0)
+        qc.p(x[1] + x[2 * num_qubits - 1], 0)
         qc.cx(num_qubits - 1, 0)
     qc_inst = qc.to_instruction()
     qc = QuantumCircuit(num_qubits)
@@ -112,16 +109,52 @@ def pool_circuit(origin, target, param_name):
     qc.append(qc_inst, range(num_qubits))
     return qc
 
-def convolutional_circuit(num_qubits, parameter_name):
+def convolutional_circuit(num_qubits, param_name):
     qc = QuantumCircuit(num_qubits)
+    params = ParameterVector(param_name, length=(num_qubits // 2 - 1) * 15 + 3)
+    param_pos = 0
 
-    qc.cx(1, 0)
-    qc.rz(params[0], 0)
-    qc.ry(params[1], 1)
-    qc.cx(0, 1)
-    qc.ry(params[2], 1)
-    qc.cx(1, 0)
-    qc.rz(np.pi / 2, 0)
+    def conv_circuit(params):
+        target = QuantumCircuit(2)
+        target.rz(-np.pi / 2, 1)
+        target.cx(1, 0)
+        target.rz(params[0], 0)
+        target.ry(params[1], 1)
+        target.cx(0, 1)
+        target.ry(params[2], 1)
+        target.cx(1, 0)
+        target.rz(np.pi / 2, 0)
+        return target
+
+    for i in range(0, num_qubits-2, 4):
+        qc.compose(conv_circuit(params[param_pos : (param_pos + 3)]), [i, i + 1], inplace=True)
+        param_pos += 3
+        qc.compose(conv_circuit(params[param_pos: (param_pos + 3)]), [i, i + 2], inplace=True)
+        param_pos += 3
+        qc.compose(conv_circuit(params[param_pos: (param_pos + 3)]), [i, i + 3], inplace=True)
+        param_pos += 3
+    qc.compose(conv_circuit(params[param_pos: (param_pos + 3)]), [num_qubits-2, num_qubits-1], inplace=True)
+    param_pos += 3
+
+    for i in range(2, num_qubits, 4):
+        qc.compose(conv_circuit(params[param_pos : (param_pos + 3)]), [i, i + 1], inplace=True)
+        param_pos += 3
+        qc.compose(conv_circuit(params[param_pos: (param_pos + 3)]), [i, i + 2], inplace=True)
+        param_pos += 3
+        qc.compose(conv_circuit(params[param_pos: (param_pos + 3)]), [i, i + 3], inplace=True)
+        param_pos += 3
+
+    for i in range(1, num_qubits-1, 4):
+        qc.compose(conv_circuit(params[param_pos: (param_pos + 3)]), [i, i + 1], inplace=True)
+        param_pos += 3
+        qc.compose(conv_circuit(params[param_pos: (param_pos + 3)]), [i, i + 2], inplace=True)
+        param_pos += 3
+
+    for i in range(3, num_qubits, 4):
+        qc.compose(conv_circuit(params[param_pos: (param_pos + 3)]), [i, i + 1], inplace=True)
+        param_pos += 3
+        qc.compose(conv_circuit(params[param_pos: (param_pos + 3)]), [i, i + 2], inplace=True)
+        param_pos += 3
 
     qc_inst = qc.to_instruction()
     qc = QuantumCircuit(num_qubits)
@@ -136,18 +169,6 @@ def interpreter(x):
     bits = format(x, '010b')
     return bits[::-1].find('1') if '1' in bits else 0
 
-def cost_func_domain(weights):
-    predictions = qnn.forward(train_x, weights)
-    cost = np.mean(mse(predictions, train_y))
-    callback_func(weights, cost)
-    return cost
-
-def cost_func_domain2(weights):
-    predictions = qnn.forward(train_x, weights)
-    cost = np.linalg.norm(cse(predictions, train_y))
-    callback_func(weights, cost)
-    return cost
-
 # Feature map to encode classical data into qubits
 """feature_map = denseZZ_feature_map(16, 'x')"""
 feature_map = denseZZ_feature_map(20, 'x')
@@ -159,7 +180,9 @@ ansatz.compose(pool_circuit(range(4), range(4, 8), 'p1'), range(8), inplace=True
 ansatz.compose(convolutional_circuit(4, 'c2'), range(4, 8), inplace=True)"""
 
 ansatz = QuantumCircuit(10)
-ansatz.compose(convolutional_circuit(10,'c'), range(10), inplace=True)
+ansatz.compose(convolutional_circuit(10,'c1'), range(10), inplace=True)
+ansatz.compose(denseZZ_feature_map(20, 'zz1'), range(10), inplace=True)
+ansatz.compose(convolutional_circuit(10, 'c2'), range(10), inplace=True)
 
 # Full circuit
 """QCNN = QuantumCircuit(8)
@@ -169,11 +192,11 @@ QCNN = QuantumCircuit(10)
 QCNN.compose(feature_map, range(10), inplace=True)
 QCNN.compose(ansatz, range(10), inplace=True)
 
-# Observable
+"""# Observable
 observables = []
-for j in range(4):
-    obs = SparsePauliOp.from_list([('I'*j + 'Z' + 'I'*(7-j), 1)])
-    observables.append(obs)
+for k in range(4):
+    obs = SparsePauliOp.from_list([('I'*k + 'Z' + 'I'*(7-k), 1)])
+    observables.append(obs)"""
 
 #img_full = QCNN.draw('mpl', scale=0.6, fold=30)
 #img_fm = feature_map(16, 'X').decompose().draw('mpl', scale=0.6)
@@ -191,47 +214,70 @@ for j in range(4):
     num_virtual_qubits=8
 )"""
 
-qnn = SamplerQNN(
-    circuit=QCNN.decompose(),
-    num_virtual_qubits=10,
-    sampler=Sampler(),
-    input_params=feature_map.parameters,
-    weight_params=ansatz.parameters,
-    interpret=interpreter,
-    output_shape=10
-)
-
-vqc = VQC(
-    num_qubits=10,
-    feature_map=feature_map.decompose(),
-    ansatz=ansatz.decompose(),
-    optimizer=COBYLA(maxiter=50),
-    callback=callback_func,
-    sampler=Sampler()
-)
-
 losses = []
-optimizer = COBYLA(maxiter=50)
-initial_point = algorithm_globals.random.random(qnn.num_weights)
-mse = L2Loss()
-cse = CrossEntropyLoss()
-(train_x, train_y), (test_x, test_y) = preprocess_data(16,4, size_train=50)
-#vqc.fit(train_x, train_y)
-#print(vqc.score(test_x, test_y))
-#opt_result = optimizer.minimize(cost_func_domain2, initial_point)
-#print(np.sum(np.argmax(qnn.forward(test_x, opt_result.x), axis=1) == np.argmax(test_y, axis=1)))
-#print(np.argmax(qnn.forward(test_x, opt_result.x), axis=1)==test_y)
-#classifier = NeuralNetworkClassifier(qnn, optimizer=COBYLA(maxiter=20), callback=callback_func)
+def test_vqc():
+    vqc = VQC(
+        num_qubits=10,
+        feature_map=feature_map.decompose(),
+        ansatz=ansatz.decompose(),
+        optimizer=COBYLA(maxiter=50),
+        callback=callback_func,
+        sampler=Sampler()
+    )
+    (train_x, train_y), (test_x, test_y) = preprocess_data(20, 4, size_train=60)
+    vqc.fit(train_x, train_y)
+    print(vqc.score(test_x, test_y))
+#test_vqc()
 
-"""print("Train X shape:", np.shape(train_x))
-print("Train Y shape:", np.shape(train_y))
-print("QNN output shape:", qnn.output_shape)
-sample_output = qnn.forward(train_x, np.random.random(len(qnn.weight_params)))
-print("QNN sample output:", sample_output)
-print("Sample output shape:", np.shape(sample_output))"""
+def test_optimizer():
+    qnn = SamplerQNN(
+        circuit=QCNN.decompose(),
+        num_virtual_qubits=10,
+        sampler=Sampler(),
+        input_params=feature_map.parameters,
+        weight_params=ansatz.parameters,
+        interpret=interpreter,
+        output_shape=10
+    )
+    mse = L2Loss()
+    cse = CrossEntropyLoss()
 
-#classifier.fit(train_x, train_y)
-#print(classifier.score(test_x, test_y))
+    def cost_func_domain(weights, loss_func):
+        predictions = qnn.forward(train_x, weights)
+        cost = np.mean(loss_func(predictions, train_y))
+        callback_func(weights, cost)
+        return cost
+
+    (train_x, train_y), (test_x, test_y) = preprocess_data(20, 4, size_train=60)
+    optimizer = COBYLA(maxiter=30)
+    initial_point = algorithm_globals.random.random(qnn.num_weights)
+    opt_result = optimizer.minimize(lambda w: cost_func_domain(w, cse), initial_point)
+    print(np.sum(np.argmax(qnn.forward(test_x, opt_result.x), axis=1) == np.argmax(test_y, axis=1)))
+#test_optimizer()
+
+def test_qnn():
+    qnn = SamplerQNN(
+        circuit=QCNN.decompose(),
+        num_virtual_qubits=10,
+        sampler=Sampler(),
+        input_params=feature_map.parameters,
+        weight_params=ansatz.parameters,
+        interpret=interpreter,
+        output_shape=10
+    )
+    (train_x, train_y), (test_x, test_y) = preprocess_data(20, 4, size_train=60)
+    classifier = NeuralNetworkClassifier(qnn, optimizer=COBYLA(maxiter=60), callback=callback_func)
+    classifier.fit(train_x, train_y)
+    print(classifier.score(test_x, test_y))
+test_qnn()
+
+def view_data(qnn, train_x, train_y):
+    print("Train X shape:", np.shape(train_x))
+    print("Train Y shape:", np.shape(train_y))
+    print("QNN output shape:", qnn.output_shape)
+    sample_output = qnn.forward(train_x, np.random.random(len(qnn.weight_params)))
+    print("QNN sample output:", sample_output)
+    print("Sample output shape:", np.shape(sample_output))
 
 plt.title("Loss against iteration")
 plt.xlabel("Iteration")
