@@ -17,27 +17,6 @@ def process_image_to_classic(image_data):
     img = ImageOps.invert(img)
     return np.asarray(img).reshape(-1, 28, 28, 1).astype('float32')
 
-def process_image_to_quantum(image_data, threshold):
-    coords = np.argwhere(np.uint8(image_data[:, :, 0]) < 250 - threshold)
-    y0, x0 = coords.min(axis=0)
-    y1, x1 = coords.max(axis=0) + 1
-    np_img = np.uint8(image_data[:, :, 0]) #* 2 * np.pi
-    img = Image.fromarray(np_img)
-    img = img.crop((x0, y0, x1, y1))
-    img = img.convert('L')
-    img = ImageOps.invert(img)
-    img = img.resize((4, 5))
-
-    source = np.asarray(img)
-    im_n = np.zeros((280, 224))
-    for i in range(280):
-        for j in range(224):
-            im_n[i, j] = source[i//56, j//56]
-    imaaa = Image.fromarray(im_n)
-    imaaa = imaaa.convert('L')
-
-    return img, imaaa
-
 # Supage for single model option
 def single_model(model_key: str):
     model = st.session_state[model_key]
@@ -112,9 +91,6 @@ def ensemble_model(arith: bool):
         if canvas_result.image_data is not None:
             # Digit prediction
             img_array = process_image_to_classic(canvas_result.image_data)
-
-            _, ii = process_image_to_quantum(canvas_result.image_data, 10)
-            st.image(ii)
 
             with st.spinner('Predicting'):
                 pred1 = softmax(model1.predict(img_array)).numpy()[0]
@@ -201,4 +177,3 @@ with st.sidebar:
     st.markdown('---')
     st.write('Created using')
     st.image('https://www.tensorflow.org/images/tf_logo_social.png', width=120)
-

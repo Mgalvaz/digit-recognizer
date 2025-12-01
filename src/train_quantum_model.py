@@ -20,6 +20,26 @@ from qiskit_aer.primitives import SamplerV2 as Sampler
 from qiskit_aer.primitives import EstimatorV2 as Estimator
 import matplotlib.pyplot as plt
 
+def process_image_to_quantum(image_data, threshold):
+    coords = np.argwhere(np.uint8(image_data[:, :, 0]) < 250 - threshold)
+    y0, x0 = coords.min(axis=0)
+    y1, x1 = coords.max(axis=0) + 1
+    np_img = np.uint8(image_data[:, :, 0]) #* 2 * np.pi
+    img = Image.fromarray(np_img)
+    img = img.crop((x0, y0, x1, y1))
+    img = img.convert('L')
+    img = ImageOps.invert(img)
+    img = img.resize((4, 5))
+
+    source = np.asarray(img)
+    im_n = np.zeros((280, 224))
+    for i in range(280):
+        for j in range(224):
+            im_n[i, j] = source[i//56, j//56]
+    imaaa = Image.fromarray(im_n)
+    imaaa = imaaa.convert('L')
+
+    return img, imaaa
 
 # Get a portion of the MNIST dataset and reduce the number of features
 def preprocess_data(input_features, output, size_train=2000, test=0.25):
