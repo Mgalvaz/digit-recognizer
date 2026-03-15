@@ -1,23 +1,15 @@
-import random
-
 import numpy as np
 from PIL import ImageOps, Image
-from qiskit.circuit.library import efficient_su2
-from qiskit.quantum_info import SparsePauliOp
 from qiskit_machine_learning.algorithms import NeuralNetworkClassifier, VQC
-from qiskit_machine_learning.gradients import ParamShiftEstimatorGradient
 from qiskit_machine_learning.optimizers import COBYLA
 from qiskit_machine_learning.utils import algorithm_globals
 from qiskit_machine_learning.utils.loss_functions import L2Loss, CrossEntropyLoss
-from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler
 from keras.datasets import mnist
 from keras.utils import to_categorical
 from qiskit import QuantumCircuit
 from qiskit.circuit import ParameterVector
-from qiskit_machine_learning.neural_networks import SamplerQNN, EstimatorQNN
+from qiskit_machine_learning.neural_networks import SamplerQNN
 from qiskit_aer.primitives import SamplerV2 as Sampler
-from qiskit_aer.primitives import EstimatorV2 as Estimator
 import matplotlib.pyplot as plt
 
 def process_image_to_quantum(image_data, threshold):
