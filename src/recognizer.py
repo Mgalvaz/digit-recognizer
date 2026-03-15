@@ -11,7 +11,7 @@ from functools import partial
 THRESHOLD = 0.7 # Change this number if you want a different threshold. It should be in the range (0,1)
 
 # Reads the image drawn in the canvas and converts it to an array that can be fed to the CNN
-def process_image_to_classic(image_data):
+def process_image(image_data):
     img = Image.fromarray(np.uint8(image_data[:, :, 0]))
     img = img.resize((28, 28)).convert('L')
     img = ImageOps.invert(img)
@@ -26,7 +26,7 @@ def single_model(model_key: str):
     thr = st.sidebar.number_input('Threshold: ', 0.0, 1.0, value = THRESHOLD, disabled=True)
     if st.button('Predict'):
         if canvas_result.image_data is not None:
-            img_array = process_image_to_classic(canvas_result.image_data)
+            img_array = process_image(canvas_result.image_data)
             with st.spinner('Predicting'):
 
                 # Digit prediction
@@ -90,7 +90,7 @@ def ensemble_model(arith: bool):
     if st.button('Predict'):
         if canvas_result.image_data is not None:
             # Digit prediction
-            img_array = process_image_to_classic(canvas_result.image_data)
+            img_array = process_image(canvas_result.image_data)
 
             with st.spinner('Predicting'):
                 pred1 = softmax(model1.predict(img_array)).numpy()[0]
