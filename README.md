@@ -104,9 +104,7 @@ digit-recognizer/
 │   ├── model2.py                   # Page with Model 2 details
 │   ├── model_view.py               # Shared visualization utilities (plots, diagrams)
 │   ├── train_classical_model.ipynb # Classical model training script in jupyter notebook
-│   ├── train_classical_model.py    # Classical model training script (creates .keras and .json files)
-│   ├── train_quantum_model.ipynb   # Quantum model training script in jupyter notebook
-│   └── train_quantum_model.py      # Quantum model training script 
+│   └── train_classical_model.py    # Classical model training script (creates .keras and .json files)
 │
 ├── img/                          # GIFs for README
 │   ├── demo_drawing.gif
