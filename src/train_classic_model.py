@@ -10,6 +10,13 @@ from keras.datasets import mnist
 from keras.utils import to_categorical
 
 def save_history(history, test_loss, test_acc, filename):
+    """
+    Saves training history to a json file.
+    :param history: The training history.
+    :param test_loss: The loss of the model throughout the test set.
+    :param test_acc: The accuracy of the test set.
+    :param filename: Name of the file where the training history will be saved.
+    """
     data = {
         'history': history.history,
         'test': {'test_loss': test_loss, 'test_accuracy': test_acc}

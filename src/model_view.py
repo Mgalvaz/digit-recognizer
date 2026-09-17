@@ -5,14 +5,27 @@ from keras.models import load_model
 import altair as alt
 import pandas as pd
 
-def tuple_str(t):
+def tuple_str(t: tuple) -> str:
+    """
+    Output formatting for tuples.
+    If the length of the tuple is 1, removes the comma inside the tuple.
+    Otherwise, returns the string representation of the tuple.
+    :param t: tuple to be formatted.
+    :return: string representation with the new format.
+    """
     if len(t) == 1:
         return f'({t[0]})'
     return str(t)
 
 def render_model_page(model_key: str, model_path: str, history_path: str):
-
-    # Load model if not yet loaded and its history
+    """
+    Renders the information of a given model in a Streamlit page.
+    Renders information about the layers of the model, its training loss and accuracy and the test values.
+    :param model_key: The name/identifier of the model.
+    :param model_path: The path of the model.
+    :param history_path: The path where the model history is stored.
+    """
+    # Load model and history if not yet loaded
     if model_key not in st.session_state:
         st.session_state[model_key] = load_model(model_path)
     model = st.session_state[model_key]

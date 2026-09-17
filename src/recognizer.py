@@ -11,7 +11,12 @@ from functools import partial
 THRESHOLD = 0.7 # Change this number if you want a different threshold. It should be in the range (0,1)
 
 # Reads the image drawn in the canvas and converts it to an array that can be fed to the CNN
-def process_image(image_data):
+def process_image(image_data: np.ndarray) -> np.ndarray:
+    """
+    Reads an image and processes it so the model can predict the digit.
+    :param image_data: The image to be processed.
+    :return: The processed image.
+    """
     img = Image.fromarray(np.uint8(image_data[:, :, 0]))
     img = img.resize((28, 28)).convert('L')
     img = ImageOps.invert(img)
@@ -19,15 +24,19 @@ def process_image(image_data):
 
 # Supage for single model option
 def single_model(model_key: str):
+    """
+    Page for the single model prediction option.
+    :param model_key: The name/identifier of the model.
+    """
     model = st.session_state[model_key]
     title = alt.TitleParams('Model 1' if model_key=='model1' else 'Model 2', anchor='middle')
 
     # Prediction
     thr = st.sidebar.number_input('Threshold: ', 0.0, 1.0, value = THRESHOLD, disabled=True)
-    if st.button('Predict'):
-        if canvas_result.image_data is not None:
+    if st.button('Predict'): # When the button is pressed
+        if canvas_result.image_data is not None: # If the canvas isn't empty
             img_array = process_image(canvas_result.image_data)
-            with st.spinner('Predicting'):
+            with st.spinner('Predicting'): # Leave a spinner while the prediction is loading
 
                 # Digit prediction
                 pred = softmax(model.predict(img_array)).numpy()[0]
@@ -57,21 +66,34 @@ def single_model(model_key: str):
 
 # Subpage for arithmetic or geometric ensemble option
 def ensemble_model(arith: bool):
+    """
+    Page for the ensemle model prediction option.
+    :param arith: Flags if the ensemble is arithmetic or not.
+    """
     model1 = st.session_state.model1
     model2 = st.session_state.model2
 
     # Update functions for sidebar and number inputs
     def update_from_slider():
+        """
+        Updates both alpha and beta number inputs when the slider is changed.
+        """
         st.session_state.alpha = st.session_state.alpha_slider
         st.session_state.beta = 1 - st.session_state.alpha_slider
         st.session_state.alpha_num = st.session_state.alpha
         st.session_state.beta_num = st.session_state.beta
     def update_from_alpha_num():
+        """
+        Updates both beta input and the slider when alpha input is changed.
+        """
         st.session_state.alpha = st.session_state.alpha_num
         st.session_state.beta = 1 - st.session_state.alpha_num
         st.session_state.alpha_slider = st.session_state.alpha
         st.session_state.beta_num = st.session_state.beta
     def update_from_beta_num():
+        """
+        Updates both alpha input and the slider when beta input is changed.
+        """
         st.session_state.beta = st.session_state.beta_num
         st.session_state.alpha = 1 - st.session_state.beta_num
         st.session_state.alpha_num = st.session_state.alpha
@@ -87,19 +109,18 @@ def ensemble_model(arith: bool):
 
     # Prediction
     thr = st.sidebar.number_input('Threshold: ', 0.0, 1.0, value = THRESHOLD, disabled=True)
-    if st.button('Predict'):
-        if canvas_result.image_data is not None:
-            # Digit prediction
+    if st.button('Predict'): # When the button is pressed
+        if canvas_result.image_data is not None: # If the canvas isn't empty
             img_array = process_image(canvas_result.image_data)
-
-            with st.spinner('Predicting'):
+            with st.spinner('Predicting'): # Leave a spinner while the prediction is loading
+                # Digit prediction
                 pred1 = softmax(model1.predict(img_array)).numpy()[0]
                 pred2 = softmax(model2.predict(img_array)).numpy()[0]
 
                 # Ensemble
-                if arith:
+                if arith: # Arithmetic ensemble
                     combined_pred = alpha * pred1 + beta * pred2
-                else:
+                else: # Geometric ensemble
                     combined_pred = np.power(pred1, alpha) * np.power(pred2, beta)
                     combined_pred /= sum(combined_pred)
                 digit = np.argmax(combined_pred)
